@@ -8,10 +8,10 @@
 
 Po was built by four people:
 
-- **Sean Hau Goh** ([Devpost](https://devpost.com/Ruler10123))
-- **Abraham Lira** ([Devpost](https://devpost.com/Abraham001l))
-- **Jadon Lee** ([Devpost](https://devpost.com/JadonLee8))
-- **Alexander Bui** ([Devpost](https://devpost.com/zanbowie138))
+- **Sean Hau Goh** ([GitHub](https://github.com/Ruler10123))
+- **Abraham Lira** ([GitHub](https://github.com/Abraham001l))
+- **Jadon Lee** ([GitHub](https://github.com/JadonLee8))
+- **Alexander Bui** ([GitHub](https://github.com/zanbowie138))
 
 > **About this repository:** this is the submission-only copy. The tournament built one commit of a
 > public repo, so we moved the finished bot here from our team's working repository, where the research,
