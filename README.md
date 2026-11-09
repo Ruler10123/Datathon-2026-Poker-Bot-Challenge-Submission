@@ -1,126 +1,137 @@
-# Short Deck PLO5 Bot Tournament: Participant Bundle
+# Po: 3rd place, TAMU Datathon 2026 Poker Bot Challenge
 
-Your bot is **one file, `agent.py`**. It is a complete FastAPI HTTP web server. You edit one marked section, and the tournament runs the file as-is.
+**Team gcc · bot "Po" · 3rd of 65 teams** in the official round robin of heads-up Short Deck 5-card Pot-Limit Omaha bots.
 
-## Files
-| File | What it is |
+![Official tournament replay: the table as matches finished, ending with gcc in 3rd](docs/img/tournament_replay.gif)
+
+## The team
+
+Po was built by four people:
+
+- **Sean Hau Goh** ([Devpost](https://devpost.com/Ruler10123))
+- **Abraham Lira** ([Devpost](https://devpost.com/Abraham001l))
+- **Jadon Lee** ([Devpost](https://devpost.com/JadonLee8))
+- **Alexander Bui** ([Devpost](https://devpost.com/zanbowie138))
+
+> **About this repository:** this is the submission-only copy. The tournament built one commit of a
+> public repo, so we moved the finished bot here from our team's working repository, where the research,
+> training, evaluation and most of the commits happened. The history here is short, but the work behind it
+> belongs to the whole team. Placing 3rd took all four of us, and it wouldn't have happened without
+> Abraham, Jadon and Alexander.
+
+- **Devpost:** [Po](https://devpost.com/software/po-z9uagx)
+- **Official results (interactive):** [datathon2026-vpni.onrender.com/tournament.html](https://datathon2026-vpni.onrender.com/tournament.html)
+- **Commit that played:** [`22139dc`](https://github.com/Ruler10123/Datathon-2026-Poker-Bot-Challenge-Submission/commit/22139dc9f3)
+
+## Result
+
+![Top of the official leaderboard](docs/img/leaderboard_top.png)
+
+| | |
 |---|---|
-| `agent.py` | **Your bot** with starter code. Your agent's file name **MUST BE** agent.py and it **MUST BE** in the root of your repo (i.e. don't move it) |
-| `game.py` | The rules and game state (editing this has no effect on the evaluation platform's match referee's game). |
-| `evaluator.py` | Cards and hand ranking helper tool (same as above, but its helpers are useful). |
-| `judge_engine.py` | A local judge that referees a match between two running bots and prints the result. |
-| `baseline-bots/` | Directory of dummy practice opponents, built from the same template as `agent.py`. |
-| `test_agent.py` | Tests for your bot. Add your own at the bottom. |
-| `requirements.txt` | Add all dependencies your bot requires here. Keep in mind that your Docker image will be built with this. Also must be in the root of your repo (don't move it). |
-| `requirements-dev.txt` | Dependencies for local testing. |
-| `.dockerignore` | Files left out of your bot's Docker image. The image size is limited, so list big files your bot doesn't need while playing. |
-| `docker/` | The Dockerfiles the tournament builds your bot with (don't edit them; edits have no effect on the real build). |
-| `tools/check_build.sh` | Builds your bot exactly like the tournament does and smoke-tests it. **Run this before you submit.** |
-| `tools/smoke_test.py` | The quick "does this bot work?" check that `check_build.sh` (and the tournament build) runs inside your image. |
+| Place | **3 of 65** |
+| Points | **54 / 64** (win = 1, chop = ½) |
+| Matches | 45 wins · 18 chops · **1 loss** |
+| Average margin | +1.459 big blinds per deal over 64 matches |
+| Time bank | 2.03 s used on average of the 8 s per half · 0 of 128 halves timed out |
+| Errors / forfeits | 0 |
 
-## 1. The game in one paragraph
-The variant of poker that your agent must play is *Heads-Up Short Deck 5-card Pot-Limit Omaha*.
+Every match is 1,000 deals played twice on the same cards with the seats swapped. A win needs the whole 95%
+confidence interval of the margin above zero, so close matches end as chops.
 
-* Heads-up: 1v1 Poker against other Datathon participant agents in a tournament.
-* Short Deck: 36-card deck (6 through A). Two short-deck rules: a **flush beats a full house**, and **three of a kind beats a straight**.
-* 5-card Pot-Limit Omaha (PLO): Your hand is the best five cards made from **exactly 2** of your 5 hole (initially dealt) cards and **exactly 3** board/community cards. Every turn you choose one of four actions: `FOLD`, `CHECK_CALL`, `RAISE_HALF` (half pot) or `RAISE_POT` (full pot). Pot-Limit means your raise must be a function of the current pot.
+- **Against the two teams above us:** both matches were chops. We were ahead of first-place Minsky by
+  +0.64 bb/deal, but not by enough to count as a win.
+- **Only loss:** against 3XKO, by 0.66 bb/deal.
+- **What decided the top 3:** Minsky and SoloSquad_KR each won 48 matches to our 45, so they turned 3 more
+  close matches into wins. The top four finished within 2 points of each other. The site's re-simulation
+  of every match gives us a 13.3% chance of finishing first.
 
-Each player starts every hand with 80 chips (40 big blinds). The tournament will pit your agent against other Datathon participant submitted agents in a 1v1 format. The winner of a match will be determined after 2000 hands (1000 duplicate deals) between agents.
+![gcc team profile from the official results](docs/img/gcc_profile.png)
 
-## 2. Set up
-Your agent will initially require certain dependencies to run. Install them as such, you may need to open a venv.
-```
+## How Po plays
+
+Po is a game-theory bot. It doesn't search or simulate during a match: everything is solved offline and
+shipped as strategy tables, so each decision is a table lookup. In the tournament that came to about 2 s of
+the 8 s time bank per 1,000-hand half.
+
+1. **The exact betting tree.** With only four actions (fold, check/call, half-pot raise, pot raise), a cap
+   of 4 raises per street and stacks that reset every hand, the full betting tree is small: 62 / 810 /
+   3,678 / 11,402 decision points on preflop / flop / turn / river. We keep it exact, with no bet-size
+   simplification.
+2. **Card abstraction.** Cards are what make the game big. Preflop hands are grouped losslessly into their
+   19,998 suit-equivalence classes. On the flop, turn and river, hands are clustered into 128 buckets each
+   by how their strength is distributed over the remaining cards.
+3. **A blueprint from Monte Carlo CFR.** Counterfactual regret minimization, run over that abstract game,
+   converges toward an equilibrium: a strategy that is hard to exploit. This is the safe fallback strategy
+   (`blueprint.npz`).
+4. **A response to the field.** An equilibrium only breaks even against weak opponents instead of punishing
+   their mistakes. So we recorded how real competitor bots play from their public repos (about 917,000 of
+   their decisions), built a model of that field, and trained a data-biased response (DBR) against it. The
+   result keeps much of the blueprint's safety while taking more from the field's typical leaks.
+   This is the main strategy (`strategy.npz`).
+5. **Switching during a match.** Po scores every opponent action by how likely it is under the blueprint
+   versus under the field model. If an opponent looks like an equilibrium player, Po switches to the
+   blueprint, where the exploitative strategy would give chips back. If it looks like a cluster of very
+   aggressive bots, Po switches to a third strategy trained for that cluster (`c1.npz`). Hysteresis stops
+   it from flip-flopping.
+
+We picked this build out of dozens of candidates using our own evaluation harness: duplicate matches with
+fixed seeds, a pool of style bots, every public competitor bot we could find, multi-seed runs, and a full
+check in the real tournament Docker image under the real limits.
+
+## The tournament in graphs
+
+All of these are from the [official results page](https://datathon2026-vpni.onrender.com/tournament.html),
+with gcc highlighted.
+
+**Every match, row bot against column bot** (blue = row bot won, orange = row bot lost, grey = chop):
+
+![Head-to-head heatmap of all 2,080 matches](docs/img/head_to_head.png)
+
+**Points against average margin.** Up means more matches won, right means winning by more:
+
+![Points versus bb per deal for all 65 bots](docs/img/points_vs_bb.png)
+
+**Po's 64 matches, chips over time:**
+
+![Running big blinds for each of gcc's 64 matches](docs/img/gcc_chips.png)
+
+**Against the winner, Minsky** (a chop at +0.64 bb/deal):
+
+![gcc versus Minsky, chips over time](docs/img/gcc_vs_minsky.png)
+
+**How fragile the top of the table is.** Every match re-rolled 4,000 times within its own uncertainty:
+
+![Title odds from simulated replays](docs/img/title_odds.png)
+
+## What's in this repo
+
+| Path | What it is |
+|---|---|
+| `agent.py` | The organizers' FastAPI server template. Our only edits are the team/bot names and one import of `bot/policy.py`. |
+| `bot/policy.py` | Po's policy (`new_half`, `choose_action`, `on_hand_end`) with our shared helpers inlined. Never lets an exception escape. |
+| `bot/abstraction.npz` | The card abstraction: bucket tables for each street. |
+| `bot/blueprint.npz` | The MCCFR blueprint (the safe strategy). |
+| `bot/strategy.npz` | The DBR response to the field (the main strategy). |
+| `bot/c1.npz` | The response to the aggressive cluster. |
+| `bot/switch.npz`, `bot/switch_c1.npz` | Per-node action rates used to decide when to switch strategies. |
+| `game.py`, `evaluator.py`, `judge_engine.py`, `baseline-bots/`, `docker/`, `tools/`, `test_agent.py` | The organizers' starter bundle, unchanged. |
+| `docs/STARTER_README.md` | The organizers' original README: rules, API and submission guide. |
+| `docs/img/` | Screenshots from the official results page. |
+
+## Run it
+
+```bash
 pip install -r requirements-dev.txt
+python agent.py                               # Po on port 5008
+python baseline-bots/baseline_random.py       # an opponent on port 5009
+python judge_engine.py --deals 1000 --seed 7  # full duplicate match
 ```
 
-## 3. Write your bot
-Open `agent.py` and edit:
-1. `PARTICIPANT` and `AGENT_NAME` (your team and bot names).
-2. The three functions between `YOUR CODE HERE` and `END OF YOUR CODE`:
+The tests (`python -m pytest -q`) and the Docker build check (`./tools/check_build.sh`) work as described in
+[the starter guide](docs/STARTER_README.md). Po needs only numpy beyond the server stack.
 
-| Function | When it runs | What to do |
-|---|---|---|
-| `new_half(config, memory)` | Start of each 1000-hand half | Set up anything you want to track |
-| `choose_action(obs, memory)` | Every time it is your turn | Return one of `obs.legal_actions` |
-| `on_hand_end(result, memory)` | After every hand | Optional: learn from the result |
+## Thanks
 
-`obs` holds everything you can see: your cards, the board, the pot, what you must call, the legal actions, and the action history. Every field is listed in the `choose_action` docstring.
-
-Keep anything you want to remember in the `memory` dict. It is wiped at the start of each half. In the tournament, each half also runs in a **brand-new copy of your server**, so nothing at all carries over between halves. Locally, one process can play both halves and only `memory` is wiped (other global variables are **not**). Using `memory` makes your bot behave the same in both places.
-
-## 4. Play a match
-Use three terminals:
-```
-python agent.py                             # your bot, on port 5008
-python baseline-bots/baseline_random.py     # an opponent, on port 5009
-python judge_engine.py --deals 200          # the judge: both halves, 200 deals each (default 1000)
-```
-The judge prints a report that ends with `RESULT: AGENT1_WIN`, `RESULT: AGENT2_WIN` or `RESULT: CHOP` (or `RESULT: BOTH_FORFEIT` if both bots forfeited). A bot that forfeits either half loses the match, whatever the chips say, just like in the tournament. If your bot crashes, the report shows your traceback.
-
-Every baseline bot listens on port 5009 by default. To run two at once, give one another port, e.g. `PORT=5010 python baseline-bots/baseline_always_pot.py`, and point the judge at it with `--agent2 5010`.
-
-When you run it yourself, `agent.py` listens on every network interface, so other machines on the same network (e.g. hackathon Wi-Fi) can reach it. Set `AGENT_TOKEN=<some secret>` when you start it if that worries you; the judge then needs the same value in `AGENT1_TOKEN` (or `AGENT2_TOKEN`).
-
-Useful judge options:
-- `--agent1 5008 --agent2 5009` picks the bots by port (or a full URL like `http://localhost:5008`).
-- `--seed 7` uses different cards. The same seed always gives the same cards. The actual tournament uses a secret, randomly generated seed for every match.
-- `--deals 1000` plays a full-length match (about 10 seconds with simple bots).
-- `--json out.json --logs` saves the full result and every hand.
-
-**Playing halves separately (exactly like the tournament).** Restart both bots between halves to match the tournament's fresh servers:
-```
-python judge_engine.py --half 1 --seed 7 --json h1.json   # agent1 in seat 0
-# ...restart both bots...
-python judge_engine.py --half 2 --seed 7 --json h2.json   # agent1 in seat 1
-python judge_engine.py combine h1.json h2.json            # pair the halves -> verdict
-```
-A single half ends with `RESULT: HALF_DONE`. Its chip count is mostly card luck, so only the combined result decides the match.
-
-## 5. Test and check your bot
-First install the testing dependencies:
-```
-pip install -r requirements-dev.txt
-```
-Then check your bot for tournament compatibility:
-```
-python -m pytest -q
-```
-
-Then check that it **builds and runs as a Docker image**, exactly like the tournament builds it (needs [Docker](https://docs.docker.com/get-docker/); on Windows use WSL or Git Bash):
-```
-./tools/check_build.sh
-```
-It builds the base image and your bot, checks the image size, then starts your bot with match restrictions (no network, read-only files) and plays a few sample hands. It ends with `ALL CHECKS PASSED` or tells you what to fix. The first run downloads PyTorch, so it takes a few minutes.
-
-## 6. Submit
-1. Commit and **push** your bot to your **public** GitHub repo.
-2. Get the full commit ID: `git rev-parse HEAD` (40 characters), or copy it from the commit's page on GitHub.
-3. Submit your team name, repo URL and that commit ID in the form.
-
-The tournament builds **exactly that commit**. Anything you push afterwards is ignored unless you edit your form response with a new commit ID.
-
-**If your build fails** (for example, the smoke test fails or the image is too big), your bot can't play. Run `./tools/check_build.sh` on the exact commit you submit.
-
-## 7. How a match is scored
-- **Duplicate format:** a match is two halves of 1000 deals on the **same cards**. In half 1 you sit in one seat; in half 2 you sit in the other seat and get the cards your opponent had. This cancels most of the card luck. Look into duplicate dealing for more information.
-- **Each half is played separately.** The tournament runs each half in its own fresh environment, with no shared storage and no network access. You can't use what you saw in one half (like your opponent's cards at showdown) in the other half.
-- **Score:** your average result in big blinds per deal over both halves, with a 95% confidence interval.
-- **Verdict:** you **win** (1 point) if the whole interval is above 0, **lose** (0 points) if it is below 0, and **chop** (0.5 points each) if it includes 0.
-
-## 8. Rules your bot must follow
-- **Time:** **8 seconds of thinking per half** (1000 hands), which is roughly 4–7 ms per decision on average. Network time doesn't count: the first 1 ms of every request is free. A single decision may take at most **1 second**. If your time runs out, your bot plays check-or-fold for the rest of the half.
-- **Startup:** your server must be answering within **15 seconds** of starting. Do slow setup (like building lookup tables) at startup rather than during your first decision, but keep it under that limit. `agent.py` already calls `warmup()` at startup to build `omaha_score`'s table; put your own setup next to it. Your server starts once per half.
-- **Errors:** crashing, returning something that is not an action, or making an illegal move each count as one error. After **5 errors in a half**, your bot **forfeits** that half, and **a forfeit loses the whole match** (0 points), whatever the chip count. A bot that never answers `/new-half` forfeits too. Every crash inside `on_hand_end()` counts as its own error, and finished hands arrive in batches, so one bug there can forfeit you within a few hands. Run `python -m pytest -q` to catch these. (Running out of time bank is **not** an error: your bot just checks or folds for the rest of the half.)
-- **Port:** the tournament sets the `PORT` environment variable. Keep the last lines of `agent.py` that read it, otherwise your agent's port is hardcoded and won't run on our evaluation pipeline.
-- **Hand results arrive late:** to save time, the judge delivers finished hands together with your next decision request. `on_hand_end()` still runs once per hand, always before `choose_action()` sees the next hand.
-- **Keep the server plumbing working.** If you change the routes or the reply format, the judge can't talk to your bot, and every failed call counts as an error.
-- **No outside connections:** your bot has no network access during a match, and files it writes are thrown away after each half.
-- **Files:** your bot's files are read-only during a match. Only `/tmp` is writable (512 MB), and it's wiped after each half.
-- **Libraries:** any library pip can install is allowed. List them in `requirements.txt`. The only limit is size: **your image may add at most 3 GB on top of the base image.** Some tips:
-  - The base image already includes **numpy** and **PyTorch (CPU version)**. List `torch` without a version to reuse it; other versions also work but count toward your 3 GB.
-  - **There is no GPU.** If you ask for a different PyTorch version, the build installs the CPU version automatically. Don't use GPU packages (anything with a `[cuda]` extra, `jax[cuda]`, `tensorflow[and-cuda]`): they're huge and useless here.
-  - **TensorFlow** works (`tensorflow`, about 2 GB), but takes most of your 3 GB.
-  - **FastAPI and uvicorn are fixed** at the versions in `requirements.txt`. Asking for other versions makes the build fail.
-  - Big libraries load slowly. Your server must answer within 15 seconds of starting, so check that `import`s plus loading your model fit.
-- **Threads:** the base image limits PyTorch/numpy to 1 thread (`OMP_NUM_THREADS=1`), because many bots share the machine. Your bot gets about 1 CPU.
-- **Model files:** commit them to your repo normally. Each file must be under GitHub's 100 MB limit. **Git LFS files are not downloaded.**
+Thanks to the TAMU Datathon team for running the challenge and to every team that published its bot: playing
+against the field is what shaped Po. And once more to Abraham, Jadon and Alexander.
